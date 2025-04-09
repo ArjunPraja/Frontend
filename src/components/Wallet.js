@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { format } from 'date-fns';
 
+
 const Wallet = () => {
   const partner = JSON.parse(localStorage.getItem('partner'));
   const partnerId = partner?._id;
@@ -40,16 +41,29 @@ const Wallet = () => {
   useEffect(() => {
     const fetchData = async () => {
       if (!partnerId) return;
-
+  
       try {
         setLoading(true);
         const [summaryRes, txnRes] = await Promise.all([
           axios.get(`http://localhost:5000/api/rides/wallet/summary/${partnerId}`),
           axios.get(`http://localhost:5000/api/transactions/${partnerId}?sort=-date&limit=50`)
         ]);
+  
+        const transactionsData = txnRes.data?.data || [];
+  
+        const totalDebits = transactionsData
+          .filter(txn => txn.type === 'debit')
+          .reduce((sum, txn) => sum + txn.amount, 0);
+  
+        const totalEarning = summaryRes.data.totalEarning;
+  
+        setWalletSummary({
+          ...summaryRes.data,
+          withdrawableAmount: totalEarning - totalDebits
+        });
+  
+        setTransactions(transactionsData);
         
-        setWalletSummary(summaryRes.data);
-        setTransactions(txnRes.data?.data || []);
       } catch (error) {
         console.error("Fetch error:", error);
         setError('Failed to load wallet data. Please try again.');
@@ -57,9 +71,10 @@ const Wallet = () => {
         setLoading(false);
       }
     };
-
+  
     fetchData();
   }, [partnerId]);
+  
 
   const validateForm = () => {
     const errors = {
@@ -125,7 +140,8 @@ const Wallet = () => {
       setWalletSummary(prev => ({
         ...prev,
         withdrawableAmount: prev.withdrawableAmount - Number(withdrawAmount),
-        totalEarning: prev.totalEarning - Number(withdrawAmount)
+        totalEarning: prev.totalEarning 
+        
       }));
       
       setWithdrawSuccess(true);
